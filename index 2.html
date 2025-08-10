@@ -1,0 +1,291 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Cognitive Load Coaching Playground</title>
+    <style>
+      :root { --ink:#0f172a; --muted:#64748b; --bg:#f8fafc; --card:#ffffff; --border:#e5e7eb; }
+      *{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--ink);
+        font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Inter, Arial, sans-serif;}
+      .wrap{max-width:1100px;margin:0 auto;padding:24px}
+      .card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:20px;box-shadow:0 4px 12px rgba(0,0,0,.04);}
+      h1{font-size:28px;margin:0 0 10px} .muted{color:var(--muted)} h3{margin:0 0 6px}
+      .grid{display:grid;gap:20px} .g-2{grid-template-columns:1fr 1fr} .g-3{grid-template-columns:2fr 1fr 1fr}
+      @media (max-width: 900px){ .g-2,.g-3{grid-template-columns:1fr} }
+      .pill{display:inline-flex;align-items:center;padding:6px 10px;border-radius:999px;font-size:12px;font-weight:600;border:1px solid var(--border)}
+      .pill.good{background:#ecfdf5;color:#047857;border-color:#a7f3d0}
+      .pill.warn{background:#fffbeb;color:#92400e;border-color:#fde68a}
+      .pill.bad{background:#fef2f2;color:#991b1b;border-color:#fecaca}
+      .btn{padding:8px 12px;border:1px solid var(--border);border-radius:999px;background:#fff;cursor:pointer}
+      .btn.active{background:#0f172a;color:#fff;border-color:#0f172a}
+      .row{display:flex;gap:8px;flex-wrap:wrap}
+      .note{background:#f8fafc;border:1px solid var(--border);padding:10px;border-radius:12px;font-size:14px}
+      .label{font-size:13px;font-weight:600;margin-bottom:6px;display:block}
+      input[type=range]{width:100%}
+      .checkbox{display:flex;align-items:center;gap:8px;padding:10px;border:1px solid var(--border);border-radius:12px}
+      .checkbox.active{background:#0f172a;color:#fff;border-color:#0f172a}
+      footer{font-size:12px;color:var(--muted);margin-top:24px}
+      .titleRow{display:flex;align-items:flex-start;gap:10px;margin-bottom:10px}
+      .icon{width:24px;height:24px;border-radius:10px;background:#0f172a;color:#fff;display:grid;place-items:center;font-size:14px}
+    </style>
+    <!-- React + ReactDOM + Recharts UMD via CDN -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/recharts/umd/Recharts.min.js"></script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script>
+      const { useState, useMemo } = React;
+      const { ResponsiveContainer, BarChart, Bar, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid } = Recharts;
+
+      const Pill = ({ tone = "neutral", children }) => {
+        const cls = tone === "good" ? "pill good" : tone === "warn" ? "pill warn" : tone === "bad" ? "pill bad" : "pill";
+        return React.createElement("span", { className: cls }, children);
+      };
+
+      const SectionTitle = ({ emoji, title, subtitle }) =>
+        React.createElement("div", { className:"titleRow" }, [
+          React.createElement("div", { className:"icon", key:"i" }, emoji || "★"),
+          React.createElement("div", { key:"t" }, [
+            React.createElement("h3", { key:"h" }, title),
+            subtitle ? React.createElement("p", { className:"muted", style:{margin:0}, key:"s" }, subtitle) : null
+          ])
+        ]);
+
+      function App(){
+        // 1) Chunking simulator
+        const [segments, setSegments] = useState(6);
+        const totalComplexity = 100;
+        const perSegment = useMemo(() => totalComplexity / segments, [segments]);
+        const chunkData = useMemo(() => Array.from({length:segments}, (_,i)=>({part:`Part ${i+1}`, load: +perSegment.toFixed(2)})), [segments, perSegment]);
+
+        // 2) Scaffolding explorer
+        const scaffolds = [
+          { key: "High Support", value: 1.0, desc: "Full guidance & demonstration. Athletes learn with intense supervision." },
+          { key: "Guided Practice", value: 0.75, desc: "Coach cues & shapes reps. Athletes perform increasingly on their own." },
+          { key: "Peer Support", value: 0.4, desc: "Experienced athletes assist newer teammates. Coach oversees." },
+          { key: "Independent Practice", value: 0.1, desc: "Athletes perform with minimal support. Coach monitors quality." },
+        ];
+        const [stageIndex, setStageIndex] = useState(0);
+        const stage = scaffolds[stageIndex];
+
+        // 3) Instruction simplifier
+        const [corrections, setCorrections] = useState(2);
+        const correctionTone = corrections <= 2 ? "good" : corrections <= 4 ? "warn" : "bad";
+        const correctionMsg = corrections <= 2 ? "Great pacing: 1–2 corrections keep load manageable."
+          : corrections <= 4 ? "Careful: 3–4 corrections may split attention—try batching."
+          : "Overload risk: too many notes at once. Prioritize top 1–2.";
+
+        // 4) Self‑explanation prompts
+        const skills = [
+          { id: "stunt", label: "Stunt (e.g., prep → extension)" },
+          { id: "tumbling", label: "Tumbling (e.g., BHS)" },
+          { id: "jump", label: "Jumps (e.g., toe touch)" },
+          { id: "pyramid", label: "Pyramid sequence" },
+        ];
+        const focuses = ["Technique","Timing","Safety","Communication","Power","Body lines"];
+        const [skillId, setSkillId] = useState("stunt");
+        const [focusId, setFocusId] = useState("Technique");
+        const prompts = useMemo(() => {
+          const base = {
+            stunt: [
+              "Where should the base’s force be directed in this rep? Why?",
+              "How does the flyer’s hip/shoulder line affect stability?",
+              "Which cue helps the back‑spot keep the chest tall through the dip?",
+            ],
+            tumbling: [
+              "What creates your backward momentum in the set—and how do you keep it linear?",
+              "Describe where your eyes focus during the block. Why there?",
+              "Which body shape change most improves your snap‑down?",
+            ],
+            jump: [
+              "What gets you into full extension without throwing your chest forward?",
+              "Which joint cue lifts the legs faster—hips or knees? Explain.",
+              "How does arm tempo influence landing control?",
+            ],
+            pyramid: [
+              "Which transition is the critical timing anchor for the group?",
+              "What’s the single biggest safety check before the next release?",
+              "How do you communicate if the tempo drifts mid‑sequence?",
+            ],
+          };
+          const extra = {
+            "Technique":"Name the one technical cue that would improve by 10% right now.",
+            "Timing":"What sound/beat will you sync to on the next rep?",
+            "Safety":"Name the non‑negotiable safety check before you go again.",
+            "Communication":"Who gives the count? How do others confirm they heard it?",
+            "Power":"Where should the primary force come from in this rep?",
+            "Body lines":"What alignment checkpoint will you audit in a freeze‑frame?",
+          };
+          return [...base[skillId], extra[focusId]];
+        }, [skillId, focusId]);
+
+        // 5) Athlete load monitor
+        const [signals, setSignals] = useState({confusion:false,rushed:false,chatter:false,missCounts:false,formBreaks:false});
+        const signalScore = Object.values(signals).filter(Boolean).length;
+        const loadLevel = signalScore <= 1 ? "Low" : signalScore <= 3 ? "Moderate" : "High";
+        const loadTone = loadLevel === "Low" ? "good" : loadLevel === "Moderate" ? "warn" : "bad";
+        const nextMove = loadLevel === "Low"
+          ? "Advance or connect the next chunk. Maintain focused reps."
+          : loadLevel === "Moderate"
+            ? "Pause. Re‑demo & constrain the task (one change at a time)."
+            : "Downshift: shorten counts, reduce stimuli, and reset success criteria.";
+
+        return React.createElement("div", { className:"wrap" },
+          [
+            React.createElement("header", { key:"h" },
+              [
+                React.createElement("h1", { key:"t" }, "Cognitive Load Coaching Playground"),
+                React.createElement("p", { key:"p", className:"muted" },
+                  "Explore and teach cognitive load management with hands‑on mini tools for coaches.")
+              ]
+            ),
+
+            // Chunking
+            React.createElement("div", { className:"card", key:"c1" }, [
+              React.createElement(SectionTitle, { key:"st", emoji:"📚", title:"Chunking Simulator", subtitle:"Break routines into parts to lower mental effort per step." }),
+              React.createElement("div", { className:"grid g-2", key:"grid" }, [
+                React.createElement("div", { style:{height:220}, key:"chart" },
+                  React.createElement(ResponsiveContainer, { width:"100%", height:"100%" },
+                    React.createElement(BarChart, { data: chunkData },
+                      React.createElement(CartesianGrid, { strokeDasharray:"3 3" }),
+                      React.createElement(XAxis, { dataKey:"part" }),
+                      React.createElement(YAxis, {}),
+                      React.createElement(Tooltip, null),
+                      React.createElement(Bar, { dataKey:"load", radius:[6,6,0,0] })
+                    )
+                  )
+                ),
+                React.createElement("div", { key:"controls" }, [
+                  React.createElement("label", { className:"label", key:"lab" }, "# of segments (8‑counts / chunks)"),
+                  React.createElement("input", { type:"range", min:1, max:12, value:segments, onChange:(e)=>setSegments(parseInt(e.target.value)) , key:"rng"}),
+                  React.createElement("div", { className:"row", style:{justifyContent:"space-between"}, key:"row" }, [
+                    React.createElement("strong", { key:"seg" }, segments + " segment(s)"),
+                    React.createElement(Pill, { tone:"neutral", key:"pill" }, "per‑segment load ≈ " + perSegment.toFixed(1))
+                  ]),
+                  React.createElement("ul", { className:"muted", style:{fontSize:14}, key:"ul" }, [
+                    React.createElement("li", { key:1 }, "Teach one chunk to mastery, then connect."),
+                    React.createElement("li", { key:2 }, "Use the same counts & cues to reduce extraneous load.")
+                  ])
+                ])
+              ])
+            ]),
+
+            // Scaffolding
+            React.createElement("div", { className:"card", key:"c2" }, [
+              React.createElement(SectionTitle, { key:"st", emoji:"🪜", title:"Scaffolding Support Explorer", subtitle:"Dial support down as athletes gain autonomy." }),
+              React.createElement("div", { className:"grid g-2", key:"grid" }, [
+                React.createElement("div", { style:{height:220}, key:"chart" },
+                  React.createElement(ResponsiveContainer, { width:"100%", height:"100%" },
+                    React.createElement(LineChart, { data: scaffolds.map(s=>({stage:s.key,support:s.value})) },
+                      React.createElement(CartesianGrid, { strokeDasharray:"3 3" }),
+                      React.createElement(XAxis, { dataKey:"stage", interval:0 }),
+                      React.createElement(YAxis, { domain:[0,1] }),
+                      React.createElement(Tooltip, null),
+                      React.createElement(Line, { type:"monotone", dataKey:"support", dot:true, strokeWidth:3 })
+                    )
+                  )
+                ),
+                React.createElement("div", { key:"controls" }, [
+                  React.createElement("div", { className:"row", key:"btns" },
+                    scaffolds.map((s,i)=>React.createElement("button", {
+                      key:s.key, className: "btn " + (i===stageIndex ? "active":""), onClick:()=>setStageIndex(i)
+                    }, s.key))
+                  ),
+                  React.createElement("div", { style:{marginTop:10}, key:"desc" }, [
+                    React.createElement("div", { className:"row", key:"row" }, [
+                      React.createElement("span", { className:"muted", style:{fontSize:13}, key:"lab" }, "Support level"),
+                      React.createElement(Pill, { key:"pill", tone:"neutral" }, stage.key)
+                    ]),
+                    React.createElement("p", { className:"muted", key:"p", style:{fontSize:14} }, stage.desc),
+                    React.createElement("ul", { className:"muted", style:{fontSize:14}, key:"ul" }, [
+                      React.createElement("li", { key:1 }, "Constrain the task (e.g., only set + dip) before adding variables."),
+                      React.createElement("li", { key:2 }, "Fade cues: visual → verbal → internal self‑talk.")
+                    ])
+                  ])
+                ])
+              ])
+            ]),
+
+            // Instruction Simplifier
+            React.createElement("div", { className:"card", key:"c3" }, [
+              React.createElement(SectionTitle, { key:"st", emoji:"🧠", title:"Instruction Simplifier", subtitle:"Give fewer, clearer corrections per rep." }),
+              React.createElement("div", { className:"grid g-2", key:"grid" }, [
+                React.createElement("div", { key:"controls" }, [
+                  React.createElement("div", { className:"row", style:{justifyContent:"space-between"}, key:"top" }, [
+                    React.createElement("label", { className:"label", key:"lab" }, "Corrections per rep"),
+                    React.createElement(Pill, { tone: correctionTone, key:"pill" }, correctionMsg)
+                  ]),
+                  React.createElement("input", { type:"range", min:1, max:6, value:corrections, onChange:(e)=>setCorrections(parseInt(e.target.value)), key:"rng" }),
+                  React.createElement("div", { className:"muted", style:{fontSize:14, marginTop:8}, key:"cur" }, "Current: ", React.createElement("strong", null, corrections)),
+                  React.createElement("ul", { className:"muted", style:{fontSize:14}, key:"ul" }, [
+                    React.createElement("li", { key:1 }, "Batch notes by theme (e.g., 'lines' vs. 'power')."),
+                    React.createElement("li", { key:2 }, "Re‑rep quickly after 1–2 cues to reinforce success.")
+                  ])
+                ]),
+                React.createElement("div", { key:"aside" }, [
+                  React.createElement(Pill, { tone:"good", key:"bp" }, "Best practice"),
+                  React.createElement("p", { className:"muted", style:{fontSize:14}, key:"p" }, "Aim for 1–2 specific, high‑leverage cues per attempt. Save secondary notes for the next rep.")
+                ])
+              ])
+            ]),
+
+            // Self‑Explanation
+            React.createElement("div", { className:"card", key:"c4" }, [
+              React.createElement(SectionTitle, { key:"st", emoji:"💬", title:"Self‑Explanation Prompter", subtitle:"Generate reflective questions coaches can ask on the spot." }),
+              React.createElement("div", { className:"grid g-2", key:"grid" }, [
+                React.createElement("div", { key:"left" }, [
+                  React.createElement("label", { className:"label", key:"l1" }, "Skill focus"),
+                  React.createElement("select", { value:skillId, onChange:(e)=>setSkillId(e.target.value), style:{width:"100%",padding:"10px",border:"1px solid var(--border)",borderRadius:"12px"}, key:"s1" },
+                    skills.map(s=>React.createElement("option", { key:s.id, value:s.id }, s.label))
+                  ),
+                  React.createElement("label", { className:"label", style:{marginTop:12}, key:"l2" }, "Coaching emphasis"),
+                  React.createElement("select", { value:focusId, onChange:(e)=>setFocusId(e.target.value), style:{width:"100%",padding:"10px",border:"1px solid var(--border)",borderRadius:"12px"}, key:"s2" },
+                    focuses.map(f=>React.createElement("option", { key:f, value:f }, f))
+                  )
+                ]),
+                React.createElement("div", { key:"right" },
+                  prompts.map((p,i)=>React.createElement("div", { key:i, className:"note" }, p))
+                )
+              ])
+            ]),
+
+            // Load Monitor
+            React.createElement("div", { className:"card", key:"c5" }, [
+              React.createElement(SectionTitle, { key:"st", emoji:"📈", title:"Athlete Load Monitor", subtitle:"Quick rubric to decide when to slow down or move on." }),
+              React.createElement("div", { className:"grid g-2", key:"grid" }, [
+                React.createElement("div", { className:"grid", style:{gridTemplateColumns:"1fr 1fr", gap:"12px"}, key:"checks" },
+                  Object.entries(signals).map(([k,v]) => React.createElement("label", {
+                    key:k, className: "checkbox " + (v ? "active" : "") }, [
+                      React.createElement("input", { type:"checkbox", checked:v, onChange:(e)=>setSignals(prev=>({ ...prev, [k]: e.target.checked })) }),
+                      React.createElement("span", { className:"muted", style:{fontSize:14}}, k.replace(/([A-Z])/g,' $1'))
+                    ])
+                  )
+                ),
+                React.createElement("div", { key:"result" }, [
+                  React.createElement("div", { className:"row", key:"row" }, [
+                    React.createElement("span", { className:"muted", style:{fontSize:13} }, "Load level"),
+                    React.createElement(Pill, { tone: loadTone, key:"pill" }, loadLevel)
+                  ]),
+                  React.createElement("p", { className:"muted", style:{fontSize:14} }, "Next move: " + nextMove),
+                  React.createElement("ul", { className:"muted", style:{fontSize:14} }, [
+                    React.createElement("li", { key:1 }, "High load: reduce stimuli (music off, fewer spectators, one task)."),
+                    React.createElement("li", { key:2 }, "Moderate load: mini‑demo & one cue; short blocked reps."),
+                    React.createElement("li", { key:3 }, "Low load: add connection, tempo, or environment challenge.")
+                  ])
+                ])
+              ])
+            ]),
+
+            React.createElement("footer", { key:"f" }, "Built for Core Athletics Coaches Hub. Embed this page in a Wix blog post via iFrame.")
+          ]
+        );
+      }
+
+      const root = ReactDOM.createRoot(document.getElementById("root"));
+      root.render(React.createElement(App));
+    </script>
+  </body>
+</html>
